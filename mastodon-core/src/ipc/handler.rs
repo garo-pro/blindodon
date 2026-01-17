@@ -278,11 +278,20 @@ impl MessageHandler {
                         // Store client in memory
                         let client = Arc::new(client);
                         *self.client.write().await = Some(client);
-                        *self.current_account_id.write().await = Some(account_id);
+                        *self.current_account_id.write().await = Some(account_id.clone());
 
+                        // Return account in the format expected by the UI
                         IpcMessage::response_ok(&msg.id, serde_json::json!({
                             "success": true,
-                            "account": user
+                            "account": {
+                                "id": account_id,
+                                "instance_url": stored_account.instance_url,
+                                "username": stored_account.username,
+                                "display_name": stored_account.display_name,
+                                "avatar_url": stored_account.avatar_url,
+                                "is_default": stored_account.is_default,
+                                "last_used_at": stored_account.last_used_at
+                            }
                         }))
                     }
                     Err(e) => {

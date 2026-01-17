@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -168,7 +169,7 @@ public partial class AccountSelectWindow : Window
         Close();
     }
 
-    private void ViewModel_AddAccountRequested(object? sender, EventArgs e)
+    private async void ViewModel_AddAccountRequested(object? sender, EventArgs e)
     {
         var loginWindow = new LoginWindow
         {
@@ -179,8 +180,31 @@ public partial class AccountSelectWindow : Window
 
         if (result == true && loginWindow.LoggedInAccount != null)
         {
+            Log.Information("Login completed for {Account}, refreshing account list",
+                loginWindow.LoggedInAccount.EffectiveDisplayName);
+
             // Refresh the account list to include the new account
-            _ = _viewModel.LoadAccountsAsync();
+            await _viewModel.LoadAccountsAsync();
+
+            // Auto-select the newly added account if found
+            var newAccount = _viewModel.Accounts.FirstOrDefault(a =>
+                a.InstanceUrl == loginWindow.LoggedInAccount.InstanceUrl);
+            if (newAccount != null)
+            {
+                _viewModel.SelectedAccount = newAccount;
+                AccountListBox.ScrollIntoView(newAccount);
+                App.Accessibility.Announce($"Account {newAccount.EffectiveDisplayName} added and selected. Press Enter to login.");
+            }
+
+            // Focus the list if we now have accounts
+            if (_viewModel.HasAccounts)
+            {
+                AccountListBox.Focus();
+            }
+        }
+        else
+        {
+            Log.Information("Login cancelled or failed");
         }
     }
 
