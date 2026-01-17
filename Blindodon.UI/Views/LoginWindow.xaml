@@ -19,6 +19,7 @@
         <converters:EnterInstanceStateConverter x:Key="EnterInstanceStateConverter"/>
         <converters:WaitingForCodeStateConverter x:Key="WaitingForCodeStateConverter"/>
         <converters:ProcessingStateConverter x:Key="ProcessingStateConverter"/>
+        <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
     </Window.Resources>
 
