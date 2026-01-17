@@ -99,12 +99,44 @@ public partial class MainViewModel : ObservableObject
                 StatusMessage = "Connected";
                 Log.Information("Connected to Rust core");
 
-                // Check if we have saved credentials
+                // Check if we have saved credentials and restored session
                 var authResult = await App.Bridge.SendRequestAsync("auth.get_accounts", null);
-                if (authResult != null && authResult["authenticated"]?.Value<bool>() == true)
+                if (authResult != null)
                 {
-                    IsLoggedIn = true;
-                    await LoadTimelineAsync();
+                    var isAuthenticated = authResult["authenticated"]?.Value<bool>() == true;
+                    var currentAccountId = authResult["current_account_id"]?.Value<string>();
+                    var accounts = authResult["accounts"]?.ToObject<List<Newtonsoft.Json.Linq.JObject>>() ?? new();
+
+                    if (isAuthenticated && !string.IsNullOrEmpty(currentAccountId))
+                    {
+                        // Session was restored automatically by Rust backend
+                        IsLoggedIn = true;
+                        Log.Information("Session restored for account: {AccountId}", currentAccountId);
+
+                        // Find current account info to get display name and instance
+                        var currentAccount = accounts.FirstOrDefault(a =>
+                            a["id"]?.Value<string>() == currentAccountId);
+
+                        if (currentAccount != null)
+                        {
+                            InstanceUrl = currentAccount["instance_url"]?.Value<string>() ?? "";
+                            var displayName = currentAccount["display_name"]?.Value<string>();
+                            if (string.IsNullOrEmpty(displayName))
+                            {
+                                displayName = currentAccount["username"]?.Value<string>() ?? "";
+                            }
+                            App.Audio.Play(Services.AudioManager.SoundEvent.Connected);
+                            App.Accessibility.Announce($"Welcome back, {displayName}");
+                        }
+
+                        await LoadTimelineAsync();
+                    }
+                    else if (accounts.Count > 0)
+                    {
+                        // Have saved accounts but no active session (token may have expired)
+                        Log.Information("Found {Count} saved accounts but no active session", accounts.Count);
+                        StatusMessage = "Please log in to continue";
+                    }
                 }
             }
             else

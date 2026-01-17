@@ -17,13 +17,16 @@
 //! IPC message handler
 
 use std::sync::Arc;
+use chrono::Utc;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
 use crate::api::MastodonClient;
+use crate::cache::CacheManager;
 use crate::models::{
     error_codes, methods,
-    IpcError, IpcMessage, MediaUploadRequest, NotificationRequest, TimelineRequest, TimelineType,
+    IpcError, IpcMessage, MediaUploadRequest, NotificationRequest, StoredAccount,
+    TimelineRequest, TimelineType,
 };
 use crate::log_ipc;
 
@@ -31,14 +34,57 @@ use crate::log_ipc;
 pub struct MessageHandler {
     /// Active Mastodon client (if authenticated)
     client: RwLock<Option<Arc<MastodonClient>>>,
+    /// Current account ID (if authenticated)
+    current_account_id: RwLock<Option<String>>,
+    /// Cache manager for persistence
+    cache: Arc<CacheManager>,
 }
 
 impl MessageHandler {
-    /// Create a new message handler
-    pub fn new() -> Self {
+    /// Create a new message handler with cache
+    pub fn new(cache: Arc<CacheManager>) -> Self {
         Self {
             client: RwLock::new(None),
+            current_account_id: RwLock::new(None),
+            cache,
         }
+    }
+
+    /// Initialize handler and restore saved session
+    pub async fn initialize(&self) -> anyhow::Result<()> {
+        // Try to restore the default account
+        if let Some(account) = self.cache.get_default_account().await? {
+            info!("Restoring session for {}", account.acct);
+
+            match MastodonClient::from_token(&account.instance_url, &account.access_token) {
+                Ok(client) => {
+                    // Verify the token is still valid
+                    match client.get_current_user().await {
+                        Ok(user) => {
+                            info!("Session restored for {}", user.acct);
+                            *self.client.write().await = Some(Arc::new(client));
+                            *self.current_account_id.write().await = Some(account.id.clone());
+
+                            // Update last used time
+                            if let Err(e) = self.cache.set_default_account(&account.id).await {
+                                warn!("Failed to update last used time: {}", e);
+                            }
+                        }
+                        Err(e) => {
+                            warn!(
+                                "Saved token invalid, will require re-authentication: {}",
+                                e
+                            );
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!("Failed to create client from saved token: {}", e);
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Handle an incoming IPC message
@@ -56,6 +102,13 @@ impl MessageHandler {
             methods::AUTH_CALLBACK => self.handle_auth_callback(&msg).await,
             methods::AUTH_LOGOUT => self.handle_auth_logout(&msg).await,
             methods::AUTH_GET_ACCOUNTS => self.handle_auth_get_accounts(&msg).await,
+            methods::AUTH_SWITCH_ACCOUNT => self.handle_auth_switch_account(&msg).await,
+            methods::AUTH_DELETE_ACCOUNT => self.handle_auth_delete_account(&msg).await,
+
+            // Settings methods
+            methods::SETTINGS_GET => self.handle_settings_get(&msg).await,
+            methods::SETTINGS_SET => self.handle_settings_set(&msg).await,
+            methods::SETTINGS_GET_ALL => self.handle_settings_get_all(&msg).await,
 
             // Timeline methods
             methods::TIMELINE_GET => self.handle_timeline_get(&msg).await,
@@ -185,18 +238,58 @@ impl MessageHandler {
 
         match MastodonClient::complete_auth(instance_url, code).await {
             Ok(client) => {
-                let account_info = client.get_current_user().await;
-                let client = Arc::new(client);
-                *self.client.write().await = Some(client);
-
-                match account_info {
+                match client.get_current_user().await {
                     Ok(user) => {
+                        // Create account ID from user@instance
+                        let instance_domain = instance_url
+                            .replace("https://", "")
+                            .replace("http://", "");
+                        let account_id = format!("{}@{}", user.username, instance_domain);
+
+                        // Create StoredAccount for persistence
+                        let stored_account = StoredAccount {
+                            id: account_id.clone(),
+                            instance_url: client.instance_url().to_string(),
+                            username: user.username.clone(),
+                            acct: user.acct.clone(),
+                            display_name: user.display_name.clone(),
+                            access_token: client.access_token().to_string(),
+                            refresh_token: None,
+                            token_expires_at: None,
+                            added_at: Utc::now(),
+                            last_used_at: Utc::now(),
+                            is_default: true,
+                            avatar_url: Some(user.avatar.clone()),
+                            blindodon_pm_private_key: None,
+                            blindodon_pm_public_key: None,
+                        };
+
+                        // Save to database
+                        if let Err(e) = self.cache.save_account(&stored_account).await {
+                            error!("Failed to save account: {}", e);
+                            // Continue anyway - auth succeeded
+                        }
+
+                        // Set as default
+                        if let Err(e) = self.cache.set_default_account(&account_id).await {
+                            error!("Failed to set default account: {}", e);
+                        }
+
+                        // Store client in memory
+                        let client = Arc::new(client);
+                        *self.client.write().await = Some(client);
+                        *self.current_account_id.write().await = Some(account_id);
+
                         IpcMessage::response_ok(&msg.id, serde_json::json!({
                             "success": true,
                             "account": user
                         }))
                     }
                     Err(e) => {
+                        // Auth succeeded but couldn't fetch user info - still save what we can
+                        let client = Arc::new(client);
+                        *self.client.write().await = Some(client);
+
                         IpcMessage::response_ok(&msg.id, serde_json::json!({
                             "success": true,
                             "error_fetching_user": e.to_string()
@@ -216,19 +309,283 @@ impl MessageHandler {
 
     /// Handle auth logout
     async fn handle_auth_logout(&self, msg: &IpcMessage) -> IpcMessage {
+        let account_id = self.current_account_id.read().await.clone();
+
         *self.client.write().await = None;
+        *self.current_account_id.write().await = None;
+
+        // Optionally delete the account from storage if requested
+        let delete_account = msg
+            .params
+            .as_ref()
+            .and_then(|p| p.get("delete_account"))
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
+        if delete_account {
+            if let Some(id) = &account_id {
+                if let Err(e) = self.cache.delete_account(id).await {
+                    error!("Failed to delete account: {}", e);
+                }
+            }
+        }
+
         info!("User logged out");
         IpcMessage::response_ok(&msg.id, serde_json::json!({ "success": true }))
     }
 
-    /// Handle get accounts
+    /// Handle get accounts - returns saved accounts from storage
     async fn handle_auth_get_accounts(&self, msg: &IpcMessage) -> IpcMessage {
-        // In a full implementation, this would return saved accounts from storage
         let has_client = self.client.read().await.is_some();
-        IpcMessage::response_ok(&msg.id, serde_json::json!({
-            "authenticated": has_client,
-            "accounts": []
-        }))
+        let current_account_id = self.current_account_id.read().await.clone();
+
+        let accounts = match self.cache.get_accounts().await {
+            Ok(accounts) => accounts,
+            Err(e) => {
+                error!("Failed to get accounts: {}", e);
+                vec![]
+            }
+        };
+
+        IpcMessage::response_ok(
+            &msg.id,
+            serde_json::json!({
+                "authenticated": has_client,
+                "current_account_id": current_account_id,
+                "accounts": accounts
+            }),
+        )
+    }
+
+    /// Handle switch account
+    async fn handle_auth_switch_account(&self, msg: &IpcMessage) -> IpcMessage {
+        let params = match &msg.params {
+            Some(p) => p,
+            None => {
+                return IpcMessage::response_err(
+                    &msg.id,
+                    IpcError::new(error_codes::INVALID_PARAMS, "Missing params"),
+                );
+            }
+        };
+
+        let account_id = match params.get("account_id").and_then(|v| v.as_str()) {
+            Some(id) => id,
+            None => {
+                return IpcMessage::response_err(
+                    &msg.id,
+                    IpcError::new(error_codes::INVALID_PARAMS, "Missing account_id"),
+                );
+            }
+        };
+
+        let account = match self.cache.get_account(account_id).await {
+            Ok(Some(acc)) => acc,
+            Ok(None) => {
+                return IpcMessage::response_err(
+                    &msg.id,
+                    IpcError::new(error_codes::NOT_AUTHENTICATED, "Account not found"),
+                );
+            }
+            Err(e) => {
+                return IpcMessage::response_err(
+                    &msg.id,
+                    IpcError::new(
+                        error_codes::INTERNAL_ERROR,
+                        format!("Database error: {}", e),
+                    ),
+                );
+            }
+        };
+
+        // Create client from saved token
+        match MastodonClient::from_token(&account.instance_url, &account.access_token) {
+            Ok(client) => {
+                // Verify token is still valid
+                match client.get_current_user().await {
+                    Ok(user) => {
+                        *self.client.write().await = Some(Arc::new(client));
+                        *self.current_account_id.write().await = Some(account_id.to_string());
+
+                        // Update default and last_used
+                        let _ = self.cache.set_default_account(account_id).await;
+
+                        info!("Switched to account {}", account_id);
+                        IpcMessage::response_ok(
+                            &msg.id,
+                            serde_json::json!({
+                                "success": true,
+                                "account": account,
+                                "user": user
+                            }),
+                        )
+                    }
+                    Err(e) => IpcMessage::response_err(
+                        &msg.id,
+                        IpcError::new(
+                            error_codes::API_ERROR,
+                            format!("Token expired, please re-authenticate: {}", e),
+                        ),
+                    ),
+                }
+            }
+            Err(e) => IpcMessage::response_err(
+                &msg.id,
+                IpcError::new(
+                    error_codes::INTERNAL_ERROR,
+                    format!("Failed to create client: {}", e),
+                ),
+            ),
+        }
+    }
+
+    /// Handle delete account
+    async fn handle_auth_delete_account(&self, msg: &IpcMessage) -> IpcMessage {
+        let params = match &msg.params {
+            Some(p) => p,
+            None => {
+                return IpcMessage::response_err(
+                    &msg.id,
+                    IpcError::new(error_codes::INVALID_PARAMS, "Missing params"),
+                );
+            }
+        };
+
+        let account_id = match params.get("account_id").and_then(|v| v.as_str()) {
+            Some(id) => id,
+            None => {
+                return IpcMessage::response_err(
+                    &msg.id,
+                    IpcError::new(error_codes::INVALID_PARAMS, "Missing account_id"),
+                );
+            }
+        };
+
+        // If this is the current account, log out first
+        let current_id = self.current_account_id.read().await.clone();
+        if current_id.as_deref() == Some(account_id) {
+            *self.client.write().await = None;
+            *self.current_account_id.write().await = None;
+        }
+
+        match self.cache.delete_account(account_id).await {
+            Ok(()) => {
+                info!("Deleted account {}", account_id);
+                IpcMessage::response_ok(&msg.id, serde_json::json!({ "success": true }))
+            }
+            Err(e) => IpcMessage::response_err(
+                &msg.id,
+                IpcError::new(
+                    error_codes::INTERNAL_ERROR,
+                    format!("Failed to delete account: {}", e),
+                ),
+            ),
+        }
+    }
+
+    // ===== SETTINGS HANDLERS =====
+
+    /// Handle settings get
+    async fn handle_settings_get(&self, msg: &IpcMessage) -> IpcMessage {
+        let params = match &msg.params {
+            Some(p) => p,
+            None => {
+                return IpcMessage::response_err(
+                    &msg.id,
+                    IpcError::new(error_codes::INVALID_PARAMS, "Missing params"),
+                );
+            }
+        };
+
+        let key = match params.get("key").and_then(|v| v.as_str()) {
+            Some(k) => k,
+            None => {
+                return IpcMessage::response_err(
+                    &msg.id,
+                    IpcError::new(error_codes::INVALID_PARAMS, "Missing key"),
+                );
+            }
+        };
+
+        match self.cache.get_setting(key).await {
+            Ok(value) => IpcMessage::response_ok(
+                &msg.id,
+                serde_json::json!({
+                    "key": key,
+                    "value": value
+                }),
+            ),
+            Err(e) => IpcMessage::response_err(
+                &msg.id,
+                IpcError::new(
+                    error_codes::INTERNAL_ERROR,
+                    format!("Database error: {}", e),
+                ),
+            ),
+        }
+    }
+
+    /// Handle settings set
+    async fn handle_settings_set(&self, msg: &IpcMessage) -> IpcMessage {
+        let params = match &msg.params {
+            Some(p) => p,
+            None => {
+                return IpcMessage::response_err(
+                    &msg.id,
+                    IpcError::new(error_codes::INVALID_PARAMS, "Missing params"),
+                );
+            }
+        };
+
+        let key = match params.get("key").and_then(|v| v.as_str()) {
+            Some(k) => k,
+            None => {
+                return IpcMessage::response_err(
+                    &msg.id,
+                    IpcError::new(error_codes::INVALID_PARAMS, "Missing key"),
+                );
+            }
+        };
+
+        let value = match params.get("value").and_then(|v| v.as_str()) {
+            Some(v) => v,
+            None => {
+                return IpcMessage::response_err(
+                    &msg.id,
+                    IpcError::new(error_codes::INVALID_PARAMS, "Missing value"),
+                );
+            }
+        };
+
+        match self.cache.set_setting(key, value).await {
+            Ok(()) => IpcMessage::response_ok(&msg.id, serde_json::json!({ "success": true })),
+            Err(e) => IpcMessage::response_err(
+                &msg.id,
+                IpcError::new(
+                    error_codes::INTERNAL_ERROR,
+                    format!("Database error: {}", e),
+                ),
+            ),
+        }
+    }
+
+    /// Handle settings get all
+    async fn handle_settings_get_all(&self, msg: &IpcMessage) -> IpcMessage {
+        match self.cache.get_all_settings().await {
+            Ok(settings) => IpcMessage::response_ok(
+                &msg.id,
+                serde_json::json!({
+                    "settings": settings
+                }),
+            ),
+            Err(e) => IpcMessage::response_err(
+                &msg.id,
+                IpcError::new(
+                    error_codes::INTERNAL_ERROR,
+                    format!("Database error: {}", e),
+                ),
+            ),
+        }
     }
 
     /// Handle timeline get request

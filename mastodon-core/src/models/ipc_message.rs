@@ -153,6 +153,13 @@ pub mod methods {
     pub const AUTH_LOGOUT: &str = "auth.logout";
     pub const AUTH_GET_ACCOUNTS: &str = "auth.get_accounts";
     pub const AUTH_SET_DEFAULT: &str = "auth.set_default";
+    pub const AUTH_SWITCH_ACCOUNT: &str = "auth.switch_account";
+    pub const AUTH_DELETE_ACCOUNT: &str = "auth.delete_account";
+
+    // Settings
+    pub const SETTINGS_GET: &str = "settings.get";
+    pub const SETTINGS_SET: &str = "settings.set";
+    pub const SETTINGS_GET_ALL: &str = "settings.get_all";
 
     // Timeline
     pub const TIMELINE_GET: &str = "timeline.get";

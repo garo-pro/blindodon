@@ -11,7 +11,10 @@
       "Bash(git remote add:*)",
       "Bash(git pull:*)",
       "Bash(git branch:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nchore: Add Dependabot with auto-merge for daily updates\n\n- Configure Dependabot for GitHub Actions, Cargo, and NuGet\n- Group all updates into single PRs per ecosystem\n- Auto-merge PRs when CI passes\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit:*)"
     ]
   }
 }

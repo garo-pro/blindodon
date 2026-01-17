@@ -192,6 +192,16 @@ impl MastodonClient {
         })
     }
 
+    /// Get the access token (for persistence)
+    pub fn access_token(&self) -> &str {
+        &self.access_token
+    }
+
+    /// Get the instance URL
+    pub fn instance_url(&self) -> &str {
+        &self.instance_url
+    }
+
     /// Get the current authenticated user
     pub async fn get_current_user(&self) -> Result<User> {
         let response = self.client

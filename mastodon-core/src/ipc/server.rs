@@ -22,7 +22,7 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::sync::{broadcast, Mutex};
 use tracing::{debug, error, info, warn};
 
-use crate::api::MastodonClient;
+use crate::cache::CacheManager;
 use crate::models::{IpcMessage, MessageType};
 
 use super::handler::MessageHandler;
@@ -42,11 +42,11 @@ pub struct IpcServer {
 }
 
 impl IpcServer {
-    /// Create a new IPC server
-    pub fn new() -> Self {
+    /// Create a new IPC server with the given handler
+    pub fn new(handler: Arc<MessageHandler>) -> Self {
         let (shutdown_tx, _) = broadcast::channel(1);
         Self {
-            handler: Arc::new(MessageHandler::new()),
+            handler,
             shutdown_tx,
         }
     }
@@ -66,17 +66,29 @@ impl IpcServer {
 pub async fn run_server() -> Result<()> {
     info!("Starting IPC server on {}", PIPE_NAME);
 
-    let server = Arc::new(IpcServer::new());
-    let handler = Arc::new(MessageHandler::new());
+    // Initialize the cache manager
+    let cache = Arc::new(CacheManager::new().await?);
+    info!("Cache manager initialized");
+
+    // Create handler with cache
+    let handler = Arc::new(MessageHandler::new(cache));
+
+    // Initialize handler and restore saved session
+    if let Err(e) = handler.initialize().await {
+        warn!("Failed to initialize handler (will continue anyway): {}", e);
+    }
+
+    let (shutdown_tx, _) = broadcast::channel(1);
+    let shutdown_rx = shutdown_tx.subscribe();
 
     #[cfg(windows)]
     {
-        run_windows_pipe_server(handler, server.shutdown_signal()).await
+        run_windows_pipe_server(handler, shutdown_rx).await
     }
 
     #[cfg(not(windows))]
     {
-        run_unix_socket_server(handler, server.shutdown_signal()).await
+        run_unix_socket_server(handler, shutdown_rx).await
     }
 }
 
