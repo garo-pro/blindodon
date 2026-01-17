@@ -50,7 +50,7 @@ public partial class App : Application
     /// </summary>
     public static KeybindingManager Keybindings { get; private set; } = null!;
 
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
         // Set up global exception handling first
         AppDomain.CurrentDomain.UnhandledException += (s, args) =>
@@ -74,20 +74,56 @@ public partial class App : Application
 
         try
         {
-            // Initialize services BEFORE base.OnStartup creates the window
+            base.OnStartup(e);
+
+            // Initialize services
             InitializeServices();
 
             // Start the Rust core process
             StartRustCore();
 
-            // Now let the base class process StartupUri and create the window
-            base.OnStartup(e);
+            // Wait for IPC connection
+            await ConnectToBackendAsync();
+
+            // Show account selection window
+            var accountSelectWindow = new Views.AccountSelectWindow();
+            var result = accountSelectWindow.ShowDialog();
+
+            if (result == true && accountSelectWindow.SelectedAccount != null)
+            {
+                // User selected an account, show main window
+                Log.Information("Account selected: {Account}", accountSelectWindow.SelectedAccount.EffectiveDisplayName);
+                var mainWindow = new Views.MainWindow();
+                MainWindow = mainWindow;
+                mainWindow.Show();
+            }
+            else
+            {
+                // User cancelled, exit application
+                Log.Information("Account selection cancelled, exiting");
+                Shutdown(0);
+            }
         }
         catch (Exception ex)
         {
             Log.Fatal(ex, "Startup failed");
             MessageBox.Show($"Startup failed: {ex.Message}\n\n{ex.StackTrace}", "Blindodon Error", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
+        }
+    }
+
+    private async Task ConnectToBackendAsync()
+    {
+        Log.Information("Connecting to backend...");
+        var connected = await _bridge!.ConnectAsync();
+
+        if (connected)
+        {
+            Log.Information("Connected to Rust core");
+        }
+        else
+        {
+            Log.Warning("Could not connect to Rust core, running in UI-only mode");
         }
     }
 

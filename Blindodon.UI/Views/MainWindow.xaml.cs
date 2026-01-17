@@ -47,18 +47,11 @@ public partial class MainWindow : Window
         // Announce to screen reader
         App.Accessibility.Announce("Blindodon is ready. Press Tab to navigate, or N to compose a new post.");
 
-        // Try to connect to the Rust core
+        // Initialize and load the timeline (user is already authenticated)
         await _viewModel.InitializeAsync();
 
-        // Focus the appropriate element
-        if (_viewModel.IsLoggedIn)
-        {
-            TimelineListBox.Focus();
-        }
-        else
-        {
-            InstanceUrlTextBox.Focus();
-        }
+        // Focus the timeline list
+        TimelineListBox.Focus();
     }
 
     private void SetupKeyboardNavigation()

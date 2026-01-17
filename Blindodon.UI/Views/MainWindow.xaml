@@ -151,52 +151,8 @@
 
         <!-- Main Content Area -->
         <Grid Grid.Row="1">
-            <!-- Login Panel (shown when not authenticated) -->
-            <Border x:Name="LoginPanel"
-                    Visibility="{Binding IsLoggedIn, Converter={StaticResource InverseBoolToVisibilityConverter}}"
-                    Background="{StaticResource BackgroundBrush}"
-                    Padding="40">
-                <StackPanel VerticalAlignment="Center"
-                            HorizontalAlignment="Center"
-                            MaxWidth="400">
-                    <TextBlock Text="Welcome to Blindodon"
-                               FontSize="{StaticResource FontSizeXLarge}"
-                               FontWeight="Bold"
-                               HorizontalAlignment="Center"
-                               Margin="0,0,0,20"
-                               AutomationProperties.HeadingLevel="Level1"/>
-
-                    <TextBlock Text="Enter your Mastodon instance URL to get started"
-                               FontSize="{StaticResource FontSizeNormal}"
-                               Foreground="{StaticResource TextSecondaryBrush}"
-                               HorizontalAlignment="Center"
-                               Margin="0,0,0,20"
-                               TextWrapping="Wrap"/>
-
-                    <TextBox x:Name="InstanceUrlTextBox"
-                             Text="{Binding InstanceUrl, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,0,0,16"
-                             AutomationProperties.Name="Instance URL"
-                             AutomationProperties.HelpText="Enter your Mastodon instance URL, for example mastodon.social"/>
-
-                    <Button Content="Login"
-                            Command="{Binding LoginCommand}"
-                            HorizontalAlignment="Stretch"
-                            AutomationProperties.Name="Login to Mastodon"/>
-
-                    <TextBlock x:Name="LoginStatusText"
-                               Text="{Binding LoginStatus}"
-                               Margin="0,16,0,0"
-                               TextWrapping="Wrap"
-                               HorizontalAlignment="Center"
-                               Foreground="{StaticResource TextSecondaryBrush}"
-                               AutomationProperties.LiveSetting="Polite"/>
-                </StackPanel>
-            </Border>
-
-            <!-- Timeline View (shown when authenticated) -->
-            <Grid x:Name="TimelinePanel"
-                  Visibility="{Binding IsLoggedIn, Converter={StaticResource BoolToVisibilityConverter}}">
+            <!-- Timeline View -->
+            <Grid x:Name="TimelinePanel">
 
                 <!-- Posts ListBox (hidden when on Notifications) -->
                 <ListBox x:Name="TimelineListBox"

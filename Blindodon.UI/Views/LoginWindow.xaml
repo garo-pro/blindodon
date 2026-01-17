@@ -1,0 +1,145 @@
+<Window x:Class="Blindodon.Views.LoginWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:Blindodon.ViewModels"
+        xmlns:converters="clr-namespace:Blindodon.Converters"
+        mc:Ignorable="d"
+        Title="Add Account - Blindodon"
+        Height="400" Width="450"
+        MinHeight="350" MinWidth="400"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BackgroundBrush}"
+        Foreground="{StaticResource TextPrimaryBrush}"
+        KeyDown="Window_KeyDown"
+        Loaded="Window_Loaded">
+
+    <Window.Resources>
+        <converters:EnterInstanceStateConverter x:Key="EnterInstanceStateConverter"/>
+        <converters:WaitingForCodeStateConverter x:Key="WaitingForCodeStateConverter"/>
+        <converters:ProcessingStateConverter x:Key="ProcessingStateConverter"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+    </Window.Resources>
+
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,24">
+            <TextBlock Text="Add Account"
+                       FontSize="{StaticResource FontSizeXLarge}"
+                       FontWeight="Bold"
+                       AutomationProperties.HeadingLevel="Level1"/>
+            <TextBlock Text="Connect to your Mastodon instance"
+                       FontSize="{StaticResource FontSizeNormal}"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       Margin="0,8,0,0"/>
+        </StackPanel>
+
+        <!-- State 1: Enter Instance URL -->
+        <StackPanel Grid.Row="1"
+                    Visibility="{Binding CurrentState, Converter={StaticResource EnterInstanceStateConverter}}"
+                    VerticalAlignment="Top">
+            <TextBlock Text="Instance URL"
+                       FontWeight="SemiBold"
+                       Margin="0,0,0,8"/>
+            <TextBox x:Name="InstanceUrlTextBox"
+                     Text="{Binding InstanceUrl, UpdateSourceTrigger=PropertyChanged}"
+                     Margin="0,0,0,16"
+                     AutomationProperties.Name="Instance URL"
+                     AutomationProperties.HelpText="Enter your Mastodon instance URL, for example mastodon.social"/>
+
+            <TextBlock Text="Enter the URL of your Mastodon instance. For example: mastodon.social, fosstodon.org, or your own server."
+                       TextWrapping="Wrap"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       Margin="0,0,0,24"/>
+
+            <Button x:Name="StartAuthButton"
+                    Content="Continue"
+                    Command="{Binding StartAuthCommand}"
+                    HorizontalAlignment="Stretch"
+                    AutomationProperties.Name="Continue to authorization"/>
+        </StackPanel>
+
+        <!-- State 2: Waiting for Authorization Code -->
+        <StackPanel Grid.Row="1"
+                    Visibility="{Binding CurrentState, Converter={StaticResource WaitingForCodeStateConverter}}"
+                    VerticalAlignment="Top">
+            <TextBlock Text="Authorization Code"
+                       FontWeight="SemiBold"
+                       Margin="0,0,0,8"/>
+            <TextBox x:Name="AuthCodeTextBox"
+                     Text="{Binding AuthorizationCode, UpdateSourceTrigger=PropertyChanged}"
+                     Margin="0,0,0,16"
+                     AutomationProperties.Name="Authorization code"
+                     AutomationProperties.HelpText="Paste the authorization code from your browser"/>
+
+            <TextBlock Text="Your browser has been opened. After authorizing Blindodon, copy the code shown and paste it above."
+                       TextWrapping="Wrap"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       Margin="0,0,0,24"/>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Stretch">
+                <Button Content="Back"
+                        Command="{Binding GoBackCommand}"
+                        Margin="0,0,8,0"
+                        Padding="16,8"
+                        AutomationProperties.Name="Go back to instance entry"/>
+                <Button x:Name="SubmitCodeButton"
+                        Content="Submit Code"
+                        Command="{Binding SubmitCodeCommand}"
+                        Padding="16,8"
+                        AutomationProperties.Name="Submit authorization code"/>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- State 3: Processing -->
+        <StackPanel Grid.Row="1"
+                    Visibility="{Binding CurrentState, Converter={StaticResource ProcessingStateConverter}}"
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Center">
+            <TextBlock Text="Completing authentication..."
+                       FontSize="{StaticResource FontSizeLarge}"
+                       HorizontalAlignment="Center"
+                       AutomationProperties.LiveSetting="Polite"/>
+            <TextBlock Text="Please wait while we connect your account."
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       HorizontalAlignment="Center"
+                       Margin="0,8,0,0"/>
+        </StackPanel>
+
+        <!-- Status Message -->
+        <TextBlock Grid.Row="2"
+                   Text="{Binding StatusMessage}"
+                   TextWrapping="Wrap"
+                   Margin="0,16,0,0"
+                   Foreground="{StaticResource TextSecondaryBrush}"
+                   AutomationProperties.LiveSetting="Polite"
+                   Visibility="{Binding StatusMessage, Converter={StaticResource StringToVisibilityConverter}, FallbackValue=Collapsed}"/>
+
+        <!-- Loading Indicator -->
+        <Border Grid.Row="2"
+                Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}"
+                Margin="0,16,0,0"
+                HorizontalAlignment="Left">
+            <TextBlock Text="Please wait..."
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       AutomationProperties.LiveSetting="Polite"/>
+        </Border>
+
+        <!-- Cancel Button -->
+        <Button Grid.Row="3"
+                Content="Cancel"
+                Command="{Binding CancelCommand}"
+                HorizontalAlignment="Right"
+                Margin="0,24,0,0"
+                Padding="16,8"
+                AutomationProperties.Name="Cancel and close"/>
+    </Grid>
+</Window>

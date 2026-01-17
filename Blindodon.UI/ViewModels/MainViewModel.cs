@@ -39,12 +39,6 @@ public partial class MainViewModel : ObservableObject
     private bool _isConnected;
 
     [ObservableProperty]
-    private string _instanceUrl = "";
-
-    [ObservableProperty]
-    private string _loginStatus = "";
-
-    [ObservableProperty]
     private string _statusMessage = "Ready";
 
     [ObservableProperty]
@@ -86,63 +80,26 @@ public partial class MainViewModel : ObservableObject
     public async Task InitializeAsync()
     {
         IsLoading = true;
-        StatusMessage = "Connecting to backend...";
+        StatusMessage = "Loading timeline...";
 
         try
         {
-            // Try to connect to the Rust core
-            var connected = await App.Bridge.ConnectAsync();
-            IsConnected = connected;
+            // User is already authenticated via account selection
+            IsLoggedIn = true;
+            IsConnected = App.Bridge.IsConnected;
 
-            if (connected)
+            if (IsConnected)
             {
                 StatusMessage = "Connected";
-                Log.Information("Connected to Rust core");
+                Log.Information("MainWindow initialized, user already authenticated");
 
-                // Check if we have saved credentials and restored session
-                var authResult = await App.Bridge.SendRequestAsync("auth.get_accounts", null);
-                if (authResult != null)
-                {
-                    var isAuthenticated = authResult["authenticated"]?.Value<bool>() == true;
-                    var currentAccountId = authResult["current_account_id"]?.Value<string>();
-                    var accounts = authResult["accounts"]?.ToObject<List<Newtonsoft.Json.Linq.JObject>>() ?? new();
-
-                    if (isAuthenticated && !string.IsNullOrEmpty(currentAccountId))
-                    {
-                        // Session was restored automatically by Rust backend
-                        IsLoggedIn = true;
-                        Log.Information("Session restored for account: {AccountId}", currentAccountId);
-
-                        // Find current account info to get display name and instance
-                        var currentAccount = accounts.FirstOrDefault(a =>
-                            a["id"]?.Value<string>() == currentAccountId);
-
-                        if (currentAccount != null)
-                        {
-                            InstanceUrl = currentAccount["instance_url"]?.Value<string>() ?? "";
-                            var displayName = currentAccount["display_name"]?.Value<string>();
-                            if (string.IsNullOrEmpty(displayName))
-                            {
-                                displayName = currentAccount["username"]?.Value<string>() ?? "";
-                            }
-                            App.Audio.Play(Services.AudioManager.SoundEvent.Connected);
-                            App.Accessibility.Announce($"Welcome back, {displayName}");
-                        }
-
-                        await LoadTimelineAsync();
-                    }
-                    else if (accounts.Count > 0)
-                    {
-                        // Have saved accounts but no active session (token may have expired)
-                        Log.Information("Found {Count} saved accounts but no active session", accounts.Count);
-                        StatusMessage = "Please log in to continue";
-                    }
-                }
+                // Load the timeline
+                await LoadTimelineAsync();
             }
             else
             {
                 StatusMessage = "Running in offline mode";
-                Log.Warning("Could not connect to Rust core, running in UI-only mode");
+                Log.Warning("Running in UI-only mode");
             }
         }
         catch (Exception ex)
@@ -154,166 +111,6 @@ public partial class MainViewModel : ObservableObject
         {
             IsLoading = false;
         }
-    }
-
-    [RelayCommand]
-    private async Task Login()
-    {
-        if (string.IsNullOrWhiteSpace(InstanceUrl))
-        {
-            LoginStatus = "Please enter your instance URL";
-            return;
-        }
-
-        IsLoading = true;
-        LoginStatus = "Starting authentication...";
-
-        try
-        {
-            var result = await App.Bridge.SendRequestAsync("auth.start", new { instance_url = InstanceUrl });
-
-            if (result != null)
-            {
-                var authUrl = result["auth_url"]?.Value<string>();
-                if (!string.IsNullOrEmpty(authUrl))
-                {
-                    LoginStatus = "Opening browser for authorization...";
-
-                    // Open the auth URL in the default browser
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                    {
-                        FileName = authUrl,
-                        UseShellExecute = true
-                    });
-
-                    // Show dialog to enter the authorization code
-                    var code = await ShowAuthCodeDialogAsync();
-
-                    if (!string.IsNullOrEmpty(code))
-                    {
-                        LoginStatus = "Completing authentication...";
-
-                        var callbackResult = await App.Bridge.SendRequestAsync("auth.callback", new
-                        {
-                            instance_url = InstanceUrl,
-                            code = code
-                        });
-
-                        if (callbackResult != null && callbackResult["success"]?.Value<bool>() == true)
-                        {
-                            IsLoggedIn = true;
-                            LoginStatus = "";
-                            StatusMessage = "Logged in successfully";
-
-                            App.Audio.Play(Services.AudioManager.SoundEvent.Connected);
-                            App.Accessibility.Announce("Login successful. Loading your timeline.");
-
-                            await LoadTimelineAsync();
-                        }
-                        else
-                        {
-                            LoginStatus = "Authentication failed. Please try again.";
-                        }
-                    }
-                    else
-                    {
-                        LoginStatus = "Authentication cancelled";
-                    }
-                }
-            }
-            else
-            {
-                LoginStatus = "Failed to start authentication";
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Login failed");
-            LoginStatus = $"Error: {ex.Message}";
-        }
-        finally
-        {
-            IsLoading = false;
-        }
-    }
-
-    private Task<string?> ShowAuthCodeDialogAsync()
-    {
-        // Simple input dialog for the authorization code
-        var tcs = new TaskCompletionSource<string?>();
-
-        Application.Current.Dispatcher.Invoke(() =>
-        {
-            var dialog = new Window
-            {
-                Title = "Enter Authorization Code",
-                Width = 400,
-                Height = 200,
-                WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                Owner = Application.Current.MainWindow,
-                Background = Application.Current.Resources["BackgroundBrush"] as System.Windows.Media.Brush,
-                Foreground = Application.Current.Resources["TextPrimaryBrush"] as System.Windows.Media.Brush
-            };
-
-            var panel = new System.Windows.Controls.StackPanel
-            {
-                Margin = new Thickness(20)
-            };
-
-            var label = new System.Windows.Controls.TextBlock
-            {
-                Text = "After authorizing in your browser, paste the code here:",
-                Margin = new Thickness(0, 0, 0, 10),
-                TextWrapping = TextWrapping.Wrap
-            };
-
-            var textBox = new System.Windows.Controls.TextBox
-            {
-                Margin = new Thickness(0, 0, 0, 10)
-            };
-            System.Windows.Automation.AutomationProperties.SetName(textBox, "Authorization code");
-
-            var buttonPanel = new System.Windows.Controls.StackPanel
-            {
-                Orientation = System.Windows.Controls.Orientation.Horizontal,
-                HorizontalAlignment = HorizontalAlignment.Right
-            };
-
-            var okButton = new System.Windows.Controls.Button
-            {
-                Content = "Submit",
-                Padding = new Thickness(16, 8, 16, 8),
-                Margin = new Thickness(0, 0, 8, 0)
-            };
-            okButton.Click += (s, e) =>
-            {
-                tcs.SetResult(textBox.Text);
-                dialog.Close();
-            };
-
-            var cancelButton = new System.Windows.Controls.Button
-            {
-                Content = "Cancel",
-                Padding = new Thickness(16, 8, 16, 8)
-            };
-            cancelButton.Click += (s, e) =>
-            {
-                tcs.SetResult(null);
-                dialog.Close();
-            };
-
-            buttonPanel.Children.Add(okButton);
-            buttonPanel.Children.Add(cancelButton);
-
-            panel.Children.Add(label);
-            panel.Children.Add(textBox);
-            panel.Children.Add(buttonPanel);
-
-            dialog.Content = panel;
-            dialog.ShowDialog();
-        });
-
-        return tcs.Task;
     }
 
     private async Task LoadTimelineAsync()
