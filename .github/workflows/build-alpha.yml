@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: ['*']
 
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
   DOTNET_VERSION: '9.0.x'
