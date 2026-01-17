@@ -1,0 +1,215 @@
+<Window x:Class="Blindodon.Views.ComposeWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:Blindodon.ViewModels"
+        mc:Ignorable="d"
+        Title="{Binding IsReply, Converter={StaticResource ReplyTitleConverter}}"
+        Height="450" Width="500"
+        MinHeight="350" MinWidth="400"
+        Background="{StaticResource BackgroundBrush}"
+        Foreground="{StaticResource TextPrimaryBrush}"
+        WindowStartupLocation="CenterOwner"
+        KeyDown="Window_KeyDown"
+        Loaded="Window_Loaded">
+
+    <Window.InputBindings>
+        <KeyBinding Key="Return" Modifiers="Ctrl" Command="{Binding PostCommand}"/>
+        <KeyBinding Key="Escape" Command="{Binding CancelCommand}"/>
+    </Window.InputBindings>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Reply context (if replying) -->
+        <Border Grid.Row="0"
+                Background="{StaticResource SurfaceBrush}"
+                CornerRadius="4"
+                Padding="12"
+                Margin="0,0,0,12"
+                Visibility="{Binding IsReply, Converter={StaticResource BoolToVisibilityConverter}}">
+            <StackPanel>
+                <TextBlock Text="Replying to:"
+                           FontWeight="SemiBold"
+                           Margin="0,0,0,4"
+                           AutomationProperties.Name="Replying to context"/>
+                <TextBlock Text="{Binding ReplyingTo.Account.DisplayName}"
+                           FontWeight="Bold"/>
+                <TextBlock Text="{Binding ReplyingTo.PlainContent}"
+                           TextWrapping="Wrap"
+                           MaxHeight="60"
+                           TextTrimming="CharacterEllipsis"
+                           Foreground="{StaticResource TextSecondaryBrush}"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Content warning / spoiler text -->
+        <Grid Grid.Row="1" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0"
+                       Text="CW:"
+                       VerticalAlignment="Center"
+                       Margin="0,0,8,0"
+                       ToolTip="Content warning (optional)"/>
+            <TextBox x:Name="SpoilerTextBox"
+                     Grid.Column="1"
+                     Text="{Binding SpoilerText, UpdateSourceTrigger=PropertyChanged}"
+                     AutomationProperties.Name="Content warning, optional"
+                     AutomationProperties.HelpText="Add a content warning that viewers must click to reveal your post"/>
+        </Grid>
+
+        <!-- Main content -->
+        <TextBox x:Name="ContentTextBox"
+                 Grid.Row="2"
+                 Text="{Binding Content, UpdateSourceTrigger=PropertyChanged}"
+                 AcceptsReturn="True"
+                 TextWrapping="Wrap"
+                 VerticalScrollBarVisibility="Auto"
+                 AutomationProperties.Name="Post content"
+                 AutomationProperties.HelpText="Write your post here. Press Ctrl+Enter to send."/>
+
+        <!-- Character count and visibility -->
+        <Grid Grid.Row="3" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Character count -->
+            <TextBlock Grid.Column="0"
+                       VerticalAlignment="Center"
+                       AutomationProperties.LiveSetting="Polite">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Text" Value="{Binding RemainingCharacters, StringFormat='{}{0} characters remaining'}"/>
+                        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding RemainingCharacters, Converter={StaticResource IsNegativeConverter}}" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource ErrorBrush}"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+
+            <!-- Visibility selector -->
+            <ComboBox Grid.Column="1"
+                      ItemsSource="{Binding VisibilityOptions}"
+                      SelectedValue="{Binding Visibility}"
+                      SelectedValuePath="Value"
+                      DisplayMemberPath="Label"
+                      Margin="8,0"
+                      MinWidth="120"
+                      AutomationProperties.Name="Post visibility"/>
+
+            <!-- Sensitive toggle -->
+            <CheckBox Grid.Column="2"
+                      Content="Sensitive"
+                      IsChecked="{Binding Sensitive}"
+                      VerticalAlignment="Center"
+                      AutomationProperties.Name="Mark as sensitive content"/>
+        </Grid>
+
+        <!-- Media attachments list -->
+        <ItemsControl Grid.Row="4"
+                      ItemsSource="{Binding Attachments}"
+                      Margin="0,8,0,0"
+                      Visibility="{Binding Attachments.Count, Converter={StaticResource CountToVisibilityConverter}}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Background="{StaticResource SurfaceBrush}"
+                            CornerRadius="4"
+                            Padding="8"
+                            Margin="0,4">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="{Binding Type, StringFormat='Media: {0}'}"
+                                           FontWeight="SemiBold"/>
+                                <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}"
+                                         Margin="0,4,0,0"
+                                         AutomationProperties.Name="Alt text description"/>
+                            </StackPanel>
+                            <Button Grid.Column="1"
+                                    Content="X"
+                                    Command="{Binding DataContext.RemoveAttachmentCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                    CommandParameter="{Binding}"
+                                    VerticalAlignment="Top"
+                                    Padding="8,4"
+                                    AutomationProperties.Name="Remove this attachment"/>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Action buttons -->
+        <Grid Grid.Row="5" Margin="0,16,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Attach media button (placeholder for Phase 4) -->
+            <Button Grid.Column="0"
+                    Content="Attach"
+                    Padding="12,8"
+                    IsEnabled="False"
+                    ToolTip="Media attachments coming soon"
+                    AutomationProperties.Name="Attach media, coming soon"/>
+
+            <!-- Status message -->
+            <TextBlock Grid.Column="1"
+                       Text="{Binding StatusMessage}"
+                       VerticalAlignment="Center"
+                       Margin="16,0"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       AutomationProperties.LiveSetting="Polite"/>
+
+            <!-- Post button -->
+            <Button Grid.Column="2"
+                    Content="Post"
+                    Command="{Binding PostCommand}"
+                    IsEnabled="{Binding CanPost}"
+                    Padding="24,8"
+                    Margin="0,0,8,0"
+                    AutomationProperties.Name="Send post"
+                    AutomationProperties.HelpText="Press Ctrl+Enter to send"/>
+
+            <!-- Cancel button -->
+            <Button Grid.Column="3"
+                    Content="Cancel"
+                    Command="{Binding CancelCommand}"
+                    Padding="16,8"
+                    AutomationProperties.Name="Cancel and close"/>
+        </Grid>
+    </Grid>
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+
+        <local:ReplyTitleConverter x:Key="ReplyTitleConverter"
+                                    xmlns:local="clr-namespace:Blindodon.Converters"/>
+        <local:IsNegativeConverter x:Key="IsNegativeConverter"
+                                    xmlns:local="clr-namespace:Blindodon.Converters"/>
+        <local:CountToVisibilityConverter x:Key="CountToVisibilityConverter"
+                                           xmlns:local="clr-namespace:Blindodon.Converters"/>
+    </Window.Resources>
+</Window>

@@ -1,0 +1,440 @@
+<Window x:Class="Blindodon.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:Blindodon.ViewModels"
+        xmlns:converters="clr-namespace:Blindodon.Converters"
+        mc:Ignorable="d"
+        Title="Blindodon"
+        Height="700" Width="1000"
+        MinHeight="500" MinWidth="600"
+        Background="{StaticResource BackgroundBrush}"
+        Foreground="{StaticResource TextPrimaryBrush}"
+        KeyDown="Window_KeyDown"
+        Loaded="Window_Loaded">
+
+    <Window.Resources>
+        <!-- Timeline Tab Style -->
+        <Style x:Key="TimelineTabStyle" TargetType="RadioButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="Margin" Value="4,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisualStyle}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{StaticResource BorderBrush}"
+                                BorderThickness="0,0,0,2"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+                                <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter Property="BorderBrush" Value="{StaticResource FocusBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Value Converters -->
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter"/>
+        <converters:InitialsConverter x:Key="InitialsConverter"/>
+        <converters:RelativeTimeConverter x:Key="RelativeTimeConverter"/>
+        <converters:ConnectionStatusColorConverter x:Key="ConnectionStatusColorConverter"/>
+        <converters:ConnectionStatusTextConverter x:Key="ConnectionStatusTextConverter"/>
+        <converters:NotificationsToVisibilityConverter x:Key="NotificationsToVisibilityConverter"/>
+        <converters:NotNotificationsToVisibilityConverter x:Key="NotNotificationsToVisibilityConverter"/>
+    </Window.Resources>
+
+    <Window.InputBindings>
+        <KeyBinding Key="N" Command="{Binding NewPostCommand}"/>
+        <KeyBinding Key="N" Modifiers="Ctrl" Command="{Binding NewPostCommand}"/>
+        <KeyBinding Key="R" Modifiers="Ctrl" Command="{Binding RefreshCommand}"/>
+        <KeyBinding Key="Q" Modifiers="Ctrl" Command="{Binding QuitCommand}"/>
+    </Window.InputBindings>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header / Toolbar -->
+        <Border Grid.Row="0"
+                Background="{StaticResource SurfaceBrush}"
+                Padding="16,8"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- App Title -->
+                <TextBlock Grid.Column="0"
+                           Text="Blindodon"
+                           FontSize="{StaticResource FontSizeXLarge}"
+                           FontWeight="Bold"
+                           VerticalAlignment="Center"
+                           AutomationProperties.HeadingLevel="Level1"/>
+
+                <!-- Timeline Tabs -->
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Center"
+                            Margin="20,0">
+                    <RadioButton x:Name="HomeTab"
+                                 Content="Home"
+                                 GroupName="Timelines"
+                                 IsChecked="True"
+                                 Style="{StaticResource TimelineTabStyle}"
+                                 Command="{Binding SwitchTimelineCommand}"
+                                 CommandParameter="Home"
+                                 AutomationProperties.Name="Home timeline"/>
+                    <RadioButton x:Name="LocalTab"
+                                 Content="Local"
+                                 GroupName="Timelines"
+                                 Style="{StaticResource TimelineTabStyle}"
+                                 Command="{Binding SwitchTimelineCommand}"
+                                 CommandParameter="Local"
+                                 AutomationProperties.Name="Local timeline"/>
+                    <RadioButton x:Name="FederatedTab"
+                                 Content="Federated"
+                                 GroupName="Timelines"
+                                 Style="{StaticResource TimelineTabStyle}"
+                                 Command="{Binding SwitchTimelineCommand}"
+                                 CommandParameter="Federated"
+                                 AutomationProperties.Name="Federated timeline"/>
+                    <RadioButton x:Name="NotificationsTab"
+                                 Content="Notifications"
+                                 GroupName="Timelines"
+                                 Style="{StaticResource TimelineTabStyle}"
+                                 Command="{Binding SwitchTimelineCommand}"
+                                 CommandParameter="Notifications"
+                                 AutomationProperties.Name="Notifications"/>
+                </StackPanel>
+
+                <!-- User Actions -->
+                <StackPanel Grid.Column="2"
+                            Orientation="Horizontal">
+                    <Button x:Name="NewPostButton"
+                            Content="New Post"
+                            Command="{Binding NewPostCommand}"
+                            Margin="0,0,8,0"
+                            AutomationProperties.Name="Create new post"
+                            AutomationProperties.HelpText="Press N to compose a new post"/>
+                    <Button x:Name="SettingsButton"
+                            Content="Settings"
+                            Command="{Binding OpenSettingsCommand}"
+                            AutomationProperties.Name="Open settings"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main Content Area -->
+        <Grid Grid.Row="1">
+            <!-- Login Panel (shown when not authenticated) -->
+            <Border x:Name="LoginPanel"
+                    Visibility="{Binding IsLoggedIn, Converter={StaticResource InverseBoolToVisibilityConverter}}"
+                    Background="{StaticResource BackgroundBrush}"
+                    Padding="40">
+                <StackPanel VerticalAlignment="Center"
+                            HorizontalAlignment="Center"
+                            MaxWidth="400">
+                    <TextBlock Text="Welcome to Blindodon"
+                               FontSize="{StaticResource FontSizeXLarge}"
+                               FontWeight="Bold"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,20"
+                               AutomationProperties.HeadingLevel="Level1"/>
+
+                    <TextBlock Text="Enter your Mastodon instance URL to get started"
+                               FontSize="{StaticResource FontSizeNormal}"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,20"
+                               TextWrapping="Wrap"/>
+
+                    <TextBox x:Name="InstanceUrlTextBox"
+                             Text="{Binding InstanceUrl, UpdateSourceTrigger=PropertyChanged}"
+                             Margin="0,0,0,16"
+                             AutomationProperties.Name="Instance URL"
+                             AutomationProperties.HelpText="Enter your Mastodon instance URL, for example mastodon.social"/>
+
+                    <Button Content="Login"
+                            Command="{Binding LoginCommand}"
+                            HorizontalAlignment="Stretch"
+                            AutomationProperties.Name="Login to Mastodon"/>
+
+                    <TextBlock x:Name="LoginStatusText"
+                               Text="{Binding LoginStatus}"
+                               Margin="0,16,0,0"
+                               TextWrapping="Wrap"
+                               HorizontalAlignment="Center"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               AutomationProperties.LiveSetting="Polite"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Timeline View (shown when authenticated) -->
+            <Grid x:Name="TimelinePanel"
+                  Visibility="{Binding IsLoggedIn, Converter={StaticResource BoolToVisibilityConverter}}">
+
+                <!-- Posts ListBox (hidden when on Notifications) -->
+                <ListBox x:Name="TimelineListBox"
+                         ItemsSource="{Binding Posts}"
+                         SelectedItem="{Binding SelectedPost}"
+                         VirtualizingPanel.IsVirtualizing="True"
+                         VirtualizingPanel.VirtualizationMode="Recycling"
+                         ScrollViewer.CanContentScroll="True"
+                         AutomationProperties.Name="Timeline posts"
+                         SelectionChanged="TimelineListBox_SelectionChanged"
+                         KeyDown="TimelineListBox_KeyDown"
+                         Visibility="{Binding CurrentTimeline, Converter={StaticResource NotNotificationsToVisibilityConverter}}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="48"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- Avatar placeholder -->
+                                <Border Grid.Column="0"
+                                        Grid.RowSpan="4"
+                                        Width="40"
+                                        Height="40"
+                                        CornerRadius="20"
+                                        Background="{StaticResource SurfaceBrush}"
+                                        VerticalAlignment="Top"
+                                        Margin="0,0,8,0">
+                                    <TextBlock Text="{Binding Account.DisplayName, Converter={StaticResource InitialsConverter}}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               FontWeight="Bold"/>
+                                </Border>
+
+                                <!-- Author info -->
+                                <StackPanel Grid.Column="1"
+                                            Grid.Row="0"
+                                            Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Account.DisplayName}"
+                                               FontWeight="Bold"
+                                               Margin="0,0,8,0"
+                                               AutomationProperties.Name="Author"/>
+                                    <TextBlock Text="{Binding Account.Acct, StringFormat='@{0}'}"
+                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                               Margin="0,0,8,0"/>
+                                    <TextBlock Text="{Binding CreatedAt, Converter={StaticResource RelativeTimeConverter}}"
+                                               Foreground="{StaticResource TextSecondaryBrush}"/>
+                                </StackPanel>
+
+                                <!-- Content Warning (if present) -->
+                                <Border Grid.Column="1"
+                                        Grid.Row="1"
+                                        Background="{StaticResource WarningBrush}"
+                                        CornerRadius="4"
+                                        Padding="8,4"
+                                        Margin="0,4,0,0"
+                                        Visibility="{Binding HasContentWarning, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <TextBlock Text="{Binding SpoilerText}"
+                                               Foreground="Black"
+                                               FontWeight="SemiBold"
+                                               AutomationProperties.Name="Content warning"/>
+                                </Border>
+
+                                <!-- Post content -->
+                                <TextBlock Grid.Column="1"
+                                           Grid.Row="2"
+                                           Text="{Binding PlainContent}"
+                                           TextWrapping="Wrap"
+                                           Margin="0,4,0,0"
+                                           AutomationProperties.Name="Post content"/>
+
+                                <!-- Action buttons -->
+                                <StackPanel Grid.Column="1"
+                                            Grid.Row="3"
+                                            Orientation="Horizontal"
+                                            Margin="0,8,0,0">
+                                    <Button Content="Reply"
+                                            Command="{Binding DataContext.ReplyCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                            CommandParameter="{Binding}"
+                                            Padding="8,4"
+                                            Margin="0,0,8,0"
+                                            AutomationProperties.Name="Reply to this post"/>
+                                    <Button Content="{Binding ReblogsCount, StringFormat='Boost ({0})'}"
+                                            Command="{Binding DataContext.BoostCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                            CommandParameter="{Binding}"
+                                            Padding="8,4"
+                                            Margin="0,0,8,0"
+                                            AutomationProperties.Name="Boost this post"/>
+                                    <Button Content="{Binding FavouritesCount, StringFormat='Favorite ({0})'}"
+                                            Command="{Binding DataContext.FavoriteCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                            CommandParameter="{Binding}"
+                                            Padding="8,4"
+                                            AutomationProperties.Name="Favorite this post"/>
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <!-- Notifications ListBox (shown only on Notifications tab) -->
+                <ListBox x:Name="NotificationsListBox"
+                         ItemsSource="{Binding Notifications}"
+                         VirtualizingPanel.IsVirtualizing="True"
+                         VirtualizingPanel.VirtualizationMode="Recycling"
+                         ScrollViewer.CanContentScroll="True"
+                         AutomationProperties.Name="Notifications"
+                         KeyDown="NotificationsListBox_KeyDown"
+                         Visibility="{Binding CurrentTimeline, Converter={StaticResource NotificationsToVisibilityConverter}}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="48"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- Notification type icon -->
+                                <Border Grid.Column="0"
+                                        Grid.RowSpan="3"
+                                        Width="40"
+                                        Height="40"
+                                        CornerRadius="20"
+                                        Background="{StaticResource SurfaceBrush}"
+                                        VerticalAlignment="Top"
+                                        Margin="0,0,8,0">
+                                    <TextBlock Text="{Binding TypeIcon}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               FontSize="{StaticResource FontSizeLarge}"
+                                               AutomationProperties.Name="{Binding Type}"/>
+                                </Border>
+
+                                <!-- Notification summary -->
+                                <StackPanel Grid.Column="1"
+                                            Grid.Row="0"
+                                            Orientation="Horizontal">
+                                    <TextBlock Text="{Binding DisplayText}"
+                                               FontWeight="Bold"
+                                               Margin="0,0,8,0"
+                                               AutomationProperties.Name="Notification description"/>
+                                    <TextBlock Text="{Binding RelativeTime}"
+                                               Foreground="{StaticResource TextSecondaryBrush}"/>
+                                </StackPanel>
+
+                                <!-- Associated post content (if any) -->
+                                <TextBlock Grid.Column="1"
+                                           Grid.Row="1"
+                                           Text="{Binding Status.PlainContent}"
+                                           TextWrapping="Wrap"
+                                           Margin="0,4,0,0"
+                                           MaxHeight="60"
+                                           TextTrimming="CharacterEllipsis"
+                                           Visibility="{Binding HasStatus, Converter={StaticResource BoolToVisibilityConverter}}"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           AutomationProperties.Name="Related post content"/>
+
+                                <!-- Action buttons -->
+                                <StackPanel Grid.Column="1"
+                                            Grid.Row="2"
+                                            Orientation="Horizontal"
+                                            Margin="0,8,0,0">
+                                    <Button Content="Dismiss"
+                                            Command="{Binding DataContext.DismissNotificationCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                            CommandParameter="{Binding}"
+                                            Padding="8,4"
+                                            Margin="0,0,8,0"
+                                            AutomationProperties.Name="Dismiss this notification"/>
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <!-- Loading indicator -->
+                <Border x:Name="LoadingIndicator"
+                        Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}"
+                        Background="#80000000"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Stretch">
+                    <StackPanel VerticalAlignment="Center"
+                                HorizontalAlignment="Center">
+                        <TextBlock Text="Loading..."
+                                   FontSize="{StaticResource FontSizeLarge}"
+                                   HorizontalAlignment="Center"
+                                   AutomationProperties.LiveSetting="Polite"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Grid>
+
+        <!-- Status Bar -->
+        <Border Grid.Row="2"
+                Background="{StaticResource SurfaceBrush}"
+                Padding="16,8"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,1,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Status message -->
+                <TextBlock Grid.Column="0"
+                           Text="{Binding StatusMessage}"
+                           VerticalAlignment="Center"
+                           AutomationProperties.LiveSetting="Polite"/>
+
+                <!-- Connection status -->
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            Margin="16,0">
+                    <Ellipse Width="8"
+                             Height="8"
+                             Fill="{Binding IsConnected, Converter={StaticResource ConnectionStatusColorConverter}}"
+                             Margin="0,0,8,0"/>
+                    <TextBlock Text="{Binding IsConnected, Converter={StaticResource ConnectionStatusTextConverter}}"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Post count -->
+                <TextBlock Grid.Column="2"
+                           Text="{Binding Posts.Count, StringFormat='{}{0} posts'}"
+                           VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

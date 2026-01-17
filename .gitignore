@@ -52,3 +52,24 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# Rust
+# Build output
+target/
+
+# Backup files from rustfmt
+*.rs.bk
+
+# Cargo.lock for libraries (comment out if building a binary)
+# Cargo.lock
+
+# MSVC Windows debugger
+*.pdb
+
+# Profiling data
+perf.data
+perf.data.old
+
+# IDE/Editor specific
+.cargo/
+**/*.rs.bk

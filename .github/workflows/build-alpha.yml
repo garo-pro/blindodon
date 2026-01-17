@@ -1,0 +1,85 @@
+name: Build Alpha
+
+on:
+  push:
+    branches: ['*']
+  pull_request:
+    branches: ['*']
+
+env:
+  CARGO_TERM_COLOR: always
+  DOTNET_VERSION: '9.0.x'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: x86_64-pc-windows-msvc
+
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: mastodon-core
+
+    - name: Cache .NET packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+
+    - name: Build Rust backend (Release)
+      run: cargo build --release
+      working-directory: mastodon-core
+
+    - name: Restore .NET dependencies
+      run: dotnet restore
+      working-directory: Blindodon.UI
+
+    - name: Build .NET frontend
+      run: dotnet build --configuration Release --no-restore
+      working-directory: Blindodon.UI
+
+    - name: Publish .NET application
+      run: dotnet publish --configuration Release --no-build --output ../publish
+      working-directory: Blindodon.UI
+
+    - name: Copy Rust backend to publish folder
+      run: |
+        Copy-Item -Path "mastodon-core/target/release/mastodon-core.exe" -Destination "publish/"
+      shell: pwsh
+
+    - name: Generate build info
+      run: |
+        $commitHash = git rev-parse --short HEAD
+        $buildDate = Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC" -AsUTC
+        $branch = git rev-parse --abbrev-ref HEAD
+        @"
+        Blindodon Alpha Build
+        =====================
+        Commit: $commitHash
+        Branch: $branch
+        Built: $buildDate
+        "@ | Out-File -FilePath "publish/BUILD_INFO.txt"
+      shell: pwsh
+
+    - name: Upload alpha artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: blindodon-alpha-${{ github.sha }}
+        path: publish/
+        retention-days: 30
+        if-no-files-found: error
