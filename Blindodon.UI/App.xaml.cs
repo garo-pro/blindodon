@@ -76,6 +76,9 @@ public partial class App : Application
         {
             base.OnStartup(e);
 
+            // Prevent automatic shutdown when dialogs close
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
             // Initialize services
             InitializeServices();
 
@@ -95,6 +98,10 @@ public partial class App : Application
                 Log.Information("Account selected: {Account}", accountSelectWindow.SelectedAccount.EffectiveDisplayName);
                 var mainWindow = new Views.MainWindow();
                 MainWindow = mainWindow;
+
+                // Switch to normal shutdown mode now that main window exists
+                ShutdownMode = ShutdownMode.OnMainWindowClose;
+
                 mainWindow.Show();
             }
             else
