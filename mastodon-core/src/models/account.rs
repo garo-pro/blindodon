@@ -38,11 +38,11 @@ pub struct StoredAccount {
     pub display_name: String,
 
     /// OAuth access token
-    #[serde(skip_serializing)]
+    #[serde(skip_serializing, default)]
     pub access_token: String,
 
     /// OAuth refresh token (if available)
-    #[serde(skip_serializing)]
+    #[serde(skip_serializing, default)]
     pub refresh_token: Option<String>,
 
     /// When the token expires
@@ -61,7 +61,7 @@ pub struct StoredAccount {
     pub avatar_url: Option<String>,
 
     /// Blindodon PM private key (encrypted)
-    #[serde(skip_serializing)]
+    #[serde(skip_serializing, default)]
     pub blindodon_pm_private_key: Option<String>,
 
     /// Blindodon PM public key
