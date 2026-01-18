@@ -114,23 +114,23 @@ public partial class PostViewModel : ObservableObject
     {
         var post = new PostViewModel
         {
-            Id = json["id"]?.Value<string>() ?? "",
-            Content = json["content"]?.Value<string>() ?? "",
-            PlainContent = json["plain_content"]?.Value<string>() ?? StripHtml(json["content"]?.Value<string>() ?? ""),
-            SpoilerText = json["spoiler_text"]?.Value<string>() ?? "",
-            Visibility = json["visibility"]?.Value<string>() ?? "public",
-            Sensitive = json["sensitive"]?.Value<bool>() ?? false,
-            CreatedAt = json["created_at"]?.Value<DateTime>() ?? DateTime.Now,
-            Language = json["language"]?.Value<string>(),
-            InReplyToId = json["in_reply_to_id"]?.Value<string>(),
-            ReblogsCount = json["reblogs_count"]?.Value<int>() ?? 0,
-            FavouritesCount = json["favourites_count"]?.Value<int>() ?? 0,
-            RepliesCount = json["replies_count"]?.Value<int>() ?? 0,
-            Reblogged = json["reblogged"]?.Value<bool>() ?? false,
-            Favourited = json["favourited"]?.Value<bool>() ?? false,
-            Bookmarked = json["bookmarked"]?.Value<bool>() ?? false,
-            Muted = json["muted"]?.Value<bool>() ?? false,
-            Pinned = json["pinned"]?.Value<bool>() ?? false
+            Id = GetString(json, "id") ?? "",
+            Content = GetString(json, "content") ?? "",
+            PlainContent = GetString(json, "plain_content") ?? StripHtml(GetString(json, "content") ?? ""),
+            SpoilerText = GetString(json, "spoiler_text") ?? "",
+            Visibility = GetString(json, "visibility") ?? "public",
+            Sensitive = GetBool(json, "sensitive", false),
+            CreatedAt = GetDateTime(json, "created_at", DateTime.Now),
+            Language = GetString(json, "language", null),
+            InReplyToId = GetString(json, "in_reply_to_id", null),
+            ReblogsCount = GetInt(json, "reblogs_count", 0),
+            FavouritesCount = GetInt(json, "favourites_count", 0),
+            RepliesCount = GetInt(json, "replies_count", 0),
+            Reblogged = GetBool(json, "reblogged", false),
+            Favourited = GetBool(json, "favourited", false),
+            Bookmarked = GetBool(json, "bookmarked", false),
+            Muted = GetBool(json, "muted", false),
+            Pinned = GetBool(json, "pinned", false)
         };
 
         // Parse account
@@ -169,6 +169,38 @@ public partial class PostViewModel : ObservableObject
         var result = System.Text.RegularExpressions.Regex.Replace(html, "<[^>]+>", "");
         result = System.Net.WebUtility.HtmlDecode(result);
         return result.Trim();
+    }
+
+    private static string? GetString(JObject json, string key, string? defaultValue = null)
+    {
+        var token = json[key];
+        if (token == null || token.Type == JTokenType.Null)
+            return defaultValue;
+        return token.Value<string>() ?? defaultValue;
+    }
+
+    private static int GetInt(JObject json, string key, int defaultValue)
+    {
+        var token = json[key];
+        if (token == null || token.Type == JTokenType.Null)
+            return defaultValue;
+        return token.Value<int>();
+    }
+
+    private static bool GetBool(JObject json, string key, bool defaultValue)
+    {
+        var token = json[key];
+        if (token == null || token.Type == JTokenType.Null)
+            return defaultValue;
+        return token.Value<bool>();
+    }
+
+    private static DateTime GetDateTime(JObject json, string key, DateTime defaultValue)
+    {
+        var token = json[key];
+        if (token == null || token.Type == JTokenType.Null)
+            return defaultValue;
+        return token.Value<DateTime>();
     }
 }
 

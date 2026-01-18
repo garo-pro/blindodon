@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:Blindodon.ViewModels"
+        xmlns:converters="clr-namespace:Blindodon.Converters"
         mc:Ignorable="d"
         Title="{Binding IsReply, Converter={StaticResource ReplyTitleConverter}}"
         Height="450" Width="500"
@@ -13,6 +14,13 @@
         WindowStartupLocation="CenterOwner"
         KeyDown="Window_KeyDown"
         Loaded="Window_Loaded">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <converters:ReplyTitleConverter x:Key="ReplyTitleConverter"/>
+        <converters:IsNegativeConverter x:Key="IsNegativeConverter"/>
+        <converters:CountToVisibilityConverter x:Key="CountToVisibilityConverter"/>
+    </Window.Resources>
 
     <Window.InputBindings>
         <KeyBinding Key="Return" Modifiers="Ctrl" Command="{Binding PostCommand}"/>
@@ -201,15 +209,4 @@
                     AutomationProperties.Name="Cancel and close"/>
         </Grid>
     </Grid>
-
-    <Window.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
-
-        <local:ReplyTitleConverter x:Key="ReplyTitleConverter"
-                                    xmlns:local="clr-namespace:Blindodon.Converters"/>
-        <local:IsNegativeConverter x:Key="IsNegativeConverter"
-                                    xmlns:local="clr-namespace:Blindodon.Converters"/>
-        <local:CountToVisibilityConverter x:Key="CountToVisibilityConverter"
-                                           xmlns:local="clr-namespace:Blindodon.Converters"/>
-    </Window.Resources>
 </Window>

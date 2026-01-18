@@ -115,26 +115,58 @@ public partial class UserViewModel : ObservableObject
     {
         return new UserViewModel
         {
-            Id = json["id"]?.Value<string>() ?? "",
-            Username = json["username"]?.Value<string>() ?? "",
-            Acct = json["acct"]?.Value<string>() ?? "",
-            DisplayName = json["display_name"]?.Value<string>() ?? "",
-            Note = json["note"]?.Value<string>() ?? "",
-            Url = json["url"]?.Value<string>() ?? "",
-            Avatar = json["avatar"]?.Value<string>() ?? "",
-            AvatarStatic = json["avatar_static"]?.Value<string>() ?? "",
-            Header = json["header"]?.Value<string>() ?? "",
-            HeaderStatic = json["header_static"]?.Value<string>() ?? "",
-            Locked = json["locked"]?.Value<bool>() ?? false,
-            Bot = json["bot"]?.Value<bool>() ?? false,
-            CreatedAt = json["created_at"]?.Value<DateTime>() ?? DateTime.Now,
-            StatusesCount = json["statuses_count"]?.Value<int>() ?? 0,
-            FollowersCount = json["followers_count"]?.Value<int>() ?? 0,
-            FollowingCount = json["following_count"]?.Value<int>() ?? 0,
-            Following = json["following"]?.Value<bool>() ?? false,
-            FollowedBy = json["followed_by"]?.Value<bool>() ?? false,
-            Blocking = json["blocking"]?.Value<bool>() ?? false,
-            Muting = json["muting"]?.Value<bool>() ?? false
+            Id = GetString(json, "id", ""),
+            Username = GetString(json, "username", ""),
+            Acct = GetString(json, "acct", ""),
+            DisplayName = GetString(json, "display_name", ""),
+            Note = GetString(json, "note", ""),
+            Url = GetString(json, "url", ""),
+            Avatar = GetString(json, "avatar", ""),
+            AvatarStatic = GetString(json, "avatar_static", ""),
+            Header = GetString(json, "header", ""),
+            HeaderStatic = GetString(json, "header_static", ""),
+            Locked = GetBool(json, "locked", false),
+            Bot = GetBool(json, "bot", false),
+            CreatedAt = GetDateTime(json, "created_at", DateTime.Now),
+            StatusesCount = GetInt(json, "statuses_count", 0),
+            FollowersCount = GetInt(json, "followers_count", 0),
+            FollowingCount = GetInt(json, "following_count", 0),
+            Following = GetBool(json, "following", false),
+            FollowedBy = GetBool(json, "followed_by", false),
+            Blocking = GetBool(json, "blocking", false),
+            Muting = GetBool(json, "muting", false)
         };
+    }
+
+    private static string GetString(JObject json, string key, string defaultValue)
+    {
+        var token = json[key];
+        if (token == null || token.Type == JTokenType.Null)
+            return defaultValue;
+        return token.Value<string>() ?? defaultValue;
+    }
+
+    private static int GetInt(JObject json, string key, int defaultValue)
+    {
+        var token = json[key];
+        if (token == null || token.Type == JTokenType.Null)
+            return defaultValue;
+        return token.Value<int>();
+    }
+
+    private static bool GetBool(JObject json, string key, bool defaultValue)
+    {
+        var token = json[key];
+        if (token == null || token.Type == JTokenType.Null)
+            return defaultValue;
+        return token.Value<bool>();
+    }
+
+    private static DateTime GetDateTime(JObject json, string key, DateTime defaultValue)
+    {
+        var token = json[key];
+        if (token == null || token.Type == JTokenType.Null)
+            return defaultValue;
+        return token.Value<DateTime>();
     }
 }

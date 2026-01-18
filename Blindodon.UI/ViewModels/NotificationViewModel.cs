@@ -109,10 +109,10 @@ public partial class NotificationViewModel : ObservableObject
     {
         var notification = new NotificationViewModel
         {
-            Id = json["id"]?.Value<string>() ?? "",
-            Type = json["notification_type"]?.Value<string>() ?? json["type"]?.Value<string>() ?? "",
-            CreatedAt = json["created_at"]?.Value<DateTime>() ?? DateTime.Now,
-            Read = json["read"]?.Value<bool>() ?? false
+            Id = GetString(json, "id") ?? "",
+            Type = GetString(json, "notification_type") ?? GetString(json, "type") ?? "",
+            CreatedAt = GetDateTime(json, "created_at", DateTime.Now),
+            Read = GetBool(json, "read", false)
         };
 
         // Parse account
@@ -130,5 +130,29 @@ public partial class NotificationViewModel : ObservableObject
         }
 
         return notification;
+    }
+
+    private static string? GetString(JObject json, string key, string? defaultValue = null)
+    {
+        var token = json[key];
+        if (token == null || token.Type == JTokenType.Null)
+            return defaultValue;
+        return token.Value<string>() ?? defaultValue;
+    }
+
+    private static bool GetBool(JObject json, string key, bool defaultValue)
+    {
+        var token = json[key];
+        if (token == null || token.Type == JTokenType.Null)
+            return defaultValue;
+        return token.Value<bool>();
+    }
+
+    private static DateTime GetDateTime(JObject json, string key, DateTime defaultValue)
+    {
+        var token = json[key];
+        if (token == null || token.Type == JTokenType.Null)
+            return defaultValue;
+        return token.Value<DateTime>();
     }
 }
