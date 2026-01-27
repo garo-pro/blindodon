@@ -35,7 +35,7 @@ tracing-appender = "0.2"
 chrono = { version = "0.4", features = ["serde"] }
 
 # Unique identifiers
-uuid = { version = "1.19", features = ["v4", "serde"] }
+uuid = { version = "1.20", features = ["v4", "serde"] }
 
 # Encryption (for Blindodon PM)
 ring = "0.17"
