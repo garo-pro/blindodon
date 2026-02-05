@@ -42,7 +42,7 @@ ring = "0.17"
 base64 = "0.22"
 
 # IPC
-interprocess = "2.2"
+interprocess = "2.3"
 
 # Error handling
 thiserror = "2.0"
